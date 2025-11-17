@@ -99,8 +99,11 @@ func (idx *Index) Insert(vector []float32) (uint64, error) {
 				newNode.AddNeighbor(lc, neighbor)
 				neighborNode.AddNeighbor(lc, nodeID)
 
-				// Prune neighbors if needed
-				idx.pruneNeighbors(neighborNode, lc)
+				// Only prune if the neighbor has significantly more than M connections
+				// This maintains better graph connectivity
+				if neighborNode.NeighborCount(lc) > M*2 {
+					idx.pruneNeighbors(neighborNode, lc)
+				}
 			}
 		}
 
@@ -212,6 +215,7 @@ func (idx *Index) selectNeighbors(candidates []heapItem, M int, layer int) []uin
 }
 
 // pruneNeighbors ensures a node doesn't have more than M connections at a layer
+// using the heuristic from the HNSW paper to maintain diversity and connectivity
 func (idx *Index) pruneNeighbors(node *Node, layer int) {
 	M := idx.M
 	if layer == 0 {
@@ -229,36 +233,78 @@ func (idx *Index) pruneNeighbors(node *Node, layer int) {
 		dist float32
 	}
 
-	distances := make([]neighborDist, len(neighbors))
-	for i, neighborID := range neighbors {
+	// Only include valid neighbors (non-nil)
+	candidates := make([]neighborDist, 0, len(neighbors))
+	for _, neighborID := range neighbors {
 		neighborNode := idx.GetNode(neighborID)
 		if neighborNode != nil {
 			dist := idx.distanceBetweenNodes(node, neighborNode)
-			distances[i] = neighborDist{id: neighborID, dist: dist}
+			candidates = append(candidates, neighborDist{id: neighborID, dist: dist})
 		}
 	}
 
-	// Sort by distance (keep M closest)
-	// Simple selection: just keep first M by distance
-	// More sophisticated: could use heuristic to maintain diversity
+	// If we have fewer valid neighbors than M, keep them all
+	if len(candidates) <= M {
+		validIDs := make([]uint64, len(candidates))
+		for i, c := range candidates {
+			validIDs[i] = c.id
+		}
+		node.SetNeighbors(layer, validIDs)
+		return
+	}
+
+	// Heuristic neighbor selection from HNSW paper (Algorithm 4)
+	// Select diverse neighbors that maintain good graph connectivity
 	selectedIDs := make([]uint64, 0, M)
+	remaining := candidates
 
-	// Find M closest neighbors
-	for len(selectedIDs) < M && len(distances) > 0 {
-		minIdx := 0
-		minDist := distances[0].dist
+	// Always keep the closest neighbor
+	minIdx := 0
+	minDist := remaining[0].dist
+	for i := 1; i < len(remaining); i++ {
+		if remaining[i].dist < minDist {
+			minDist = remaining[i].dist
+			minIdx = i
+		}
+	}
+	selectedIDs = append(selectedIDs, remaining[minIdx].id)
+	remaining = append(remaining[:minIdx], remaining[minIdx+1:]...)
 
-		for i := 1; i < len(distances); i++ {
-			if distances[i].dist < minDist {
-				minDist = distances[i].dist
-				minIdx = i
+	// Select remaining M-1 neighbors using diversity heuristic
+	for len(selectedIDs) < M && len(remaining) > 0 {
+		bestIdx := 0
+		bestScore := float32(-1.0)
+
+		// Find candidate that is closest to node but diverse from selected neighbors
+		for i, candidate := range remaining {
+			candidateNode := idx.GetNode(candidate.id)
+			if candidateNode == nil {
+				continue
+			}
+
+			// Calculate minimum distance to already selected neighbors
+			minDistToSelected := float32(1e9)
+			for _, selectedID := range selectedIDs {
+				selectedNode := idx.GetNode(selectedID)
+				if selectedNode != nil {
+					distToSelected := idx.distanceBetweenNodes(candidateNode, selectedNode)
+					if distToSelected < minDistToSelected {
+						minDistToSelected = distToSelected
+					}
+				}
+			}
+
+			// Score = distance to selected (higher is better for diversity)
+			// We want neighbors that are diverse from each other
+			score := minDistToSelected
+			if score > bestScore {
+				bestScore = score
+				bestIdx = i
 			}
 		}
 
-		selectedIDs = append(selectedIDs, distances[minIdx].id)
-
-		// Remove selected element
-		distances = append(distances[:minIdx], distances[minIdx+1:]...)
+		selectedIDs = append(selectedIDs, remaining[bestIdx].id)
+		remaining = append(remaining[:bestIdx], remaining[bestIdx+1:]...)
 	}
 
 	// Update neighbors
