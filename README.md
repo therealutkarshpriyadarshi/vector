@@ -85,10 +85,18 @@ make run
 
 ## 📚 Documentation
 
+### Core Guides
+- **[GETTING_STARTED.md](GETTING_STARTED.md)** - Day-by-day guide for your first week
+- **[ROADMAP.md](ROADMAP.md)** - Complete 6-week development plan with daily tasks
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and design decisions
 - **[IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md)** - Step-by-step implementation guide
+
+### Reference & Advanced
+- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Commands, patterns, and code snippets cheat sheet
 - **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - Directory structure and organization
 - **[GO_VS_RUST.md](GO_VS_RUST.md)** - Language choice analysis
+- **[FUTURE_ALGORITHMS.md](FUTURE_ALGORITHMS.md)** - Implementing cutting-edge research (DiskANN, ScaNN, NSG)
+- **[EXTENSIBILITY.md](EXTENSIBILITY.md)** - Plugin architecture and adding new algorithms
 
 ## 🧪 Testing
 
