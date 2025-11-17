@@ -155,7 +155,7 @@ func main() {
 		retrievedDocs := retrieveDocuments(ctx, client, question, 3)
 
 		if len(retrievedDocs) == 0 {
-			fmt.Println("No relevant documents found.\n")
+			fmt.Println("No relevant documents found.")
 			continue
 		}
 

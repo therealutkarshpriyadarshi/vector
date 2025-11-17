@@ -1,0 +1,135 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vectordb
+  labels:
+    app: vectordb
+    version: v1.0.0
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: vectordb
+  template:
+    metadata:
+      labels:
+        app: vectordb
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: vectordb
+        image: vectordb:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: grpc
+          containerPort: 50051
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: VECTOR_HOST
+          value: "0.0.0.0"
+        - name: VECTOR_PORT
+          value: "50051"
+        - name: VECTOR_DATA_DIR
+          value: "/data"
+        - name: VECTOR_HNSW_M
+          valueFrom:
+            configMapKeyRef:
+              name: vectordb-config
+              key: hnsw.m
+        - name: VECTOR_HNSW_EF_CONSTRUCTION
+          valueFrom:
+            configMapKeyRef:
+              name: vectordb-config
+              key: hnsw.ef_construction
+        - name: VECTOR_DIMENSIONS
+          valueFrom:
+            configMapKeyRef:
+              name: vectordb-config
+              key: dimensions
+        - name: VECTOR_CACHE_ENABLED
+          value: "true"
+        - name: VECTOR_CACHE_CAPACITY
+          value: "1000"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          exec:
+            command:
+            - /app/vector-cli
+            - health
+            - -server
+            - localhost:50051
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - /app/vector-cli
+            - health
+            - -server
+            - localhost:50051
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: vectordb-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vectordb
+  labels:
+    app: vectordb
+spec:
+  type: LoadBalancer
+  ports:
+  - name: grpc
+    port: 50051
+    targetPort: 50051
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  selector:
+    app: vectordb
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vectordb-config
+data:
+  hnsw.m: "16"
+  hnsw.ef_construction: "200"
+  dimensions: "768"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vectordb-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

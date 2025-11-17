@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'vectordb'
+
+scrape_configs:
+  - job_name: 'vectordb'
+    static_configs:
+      - targets: ['vectordb:9090']
+        labels:
+          instance: 'vectordb-main'

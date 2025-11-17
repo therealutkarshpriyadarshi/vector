@@ -216,11 +216,11 @@ func TestDotProductInt8(t *testing.T) {
 }
 
 func TestProductQuantizer_Train(t *testing.T) {
-	pq := NewProductQuantizer(4, 8) // 4 subvectors, 8 bits per code
+	pq := NewProductQuantizer(4, 6) // 4 subvectors, 6 bits per code (64 clusters)
 
-	// Create training data (768 dimensions)
-	vectors := make([][]float32, 100)
-	for i := 0; i < 100; i++ {
+	// Create training data (768 dimensions) - need more vectors than clusters
+	vectors := make([][]float32, 500)
+	for i := 0; i < 500; i++ {
 		vectors[i] = make([]float32, 768)
 		for j := 0; j < 768; j++ {
 			vectors[i][j] = rand.Float32()
@@ -236,20 +236,20 @@ func TestProductQuantizer_Train(t *testing.T) {
 		t.Errorf("Expected 4 codebooks, got %d", len(pq.codebooks))
 	}
 
-	// Each codebook should have 2^8 = 256 centroids
+	// Each codebook should have 2^6 = 64 centroids
 	for i, codebook := range pq.codebooks {
-		if len(codebook) != 256 {
-			t.Errorf("Codebook %d: expected 256 centroids, got %d", i, len(codebook))
+		if len(codebook) != 64 {
+			t.Errorf("Codebook %d: expected 64 centroids, got %d", i, len(codebook))
 		}
 	}
 }
 
 func TestProductQuantizer_Encode(t *testing.T) {
-	pq := NewProductQuantizer(4, 8)
+	pq := NewProductQuantizer(4, 6)
 
 	// Train
-	vectors := make([][]float32, 100)
-	for i := 0; i < 100; i++ {
+	vectors := make([][]float32, 500)
+	for i := 0; i < 500; i++ {
 		vectors[i] = make([]float32, 768)
 		for j := 0; j < 768; j++ {
 			vectors[i][j] = rand.Float32()
@@ -271,11 +271,11 @@ func TestProductQuantizer_Encode(t *testing.T) {
 }
 
 func TestProductQuantizer_Decode(t *testing.T) {
-	pq := NewProductQuantizer(4, 8)
+	pq := NewProductQuantizer(4, 6)
 
 	// Train
-	vectors := make([][]float32, 100)
-	for i := 0; i < 100; i++ {
+	vectors := make([][]float32, 500)
+	for i := 0; i < 500; i++ {
 		vectors[i] = make([]float32, 768)
 		for j := 0; j < 768; j++ {
 			vectors[i][j] = rand.Float32()
