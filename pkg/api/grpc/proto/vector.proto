@@ -1,0 +1,224 @@
+syntax = "proto3";
+
+package vector;
+
+option go_package = "github.com/therealutkarshpriyadarshi/vector/pkg/api/grpc/proto";
+
+// VectorDB service provides vector database operations
+service VectorDB {
+  // Insert a single vector with metadata
+  rpc Insert(InsertRequest) returns (InsertResponse);
+
+  // Search for k nearest neighbors using vector similarity
+  rpc Search(SearchRequest) returns (SearchResponse);
+
+  // HybridSearch combines vector similarity and full-text search
+  rpc HybridSearch(HybridSearchRequest) returns (SearchResponse);
+
+  // Delete a vector by ID
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+
+  // Update an existing vector
+  rpc Update(UpdateRequest) returns (UpdateResponse);
+
+  // BatchInsert inserts multiple vectors efficiently
+  rpc BatchInsert(stream InsertRequest) returns (BatchInsertResponse);
+
+  // GetStats returns database statistics
+  rpc GetStats(StatsRequest) returns (StatsResponse);
+
+  // HealthCheck returns server health status
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// InsertRequest contains a vector and its metadata
+message InsertRequest {
+  string namespace = 1;           // Namespace for multi-tenancy
+  repeated float vector = 2;      // Vector embedding
+  map<string, string> metadata = 3; // Metadata key-value pairs
+  optional string id = 4;         // Optional custom ID (auto-generated if not provided)
+  optional string text = 5;       // Optional text content for full-text search
+}
+
+// InsertResponse returns the ID of the inserted vector
+message InsertResponse {
+  string id = 1;                  // ID of inserted vector
+  bool success = 2;               // Operation success status
+  optional string error = 3;      // Error message if failed
+}
+
+// SearchRequest specifies vector search parameters
+message SearchRequest {
+  string namespace = 1;           // Namespace to search in
+  repeated float query_vector = 2; // Query vector
+  int32 k = 3;                    // Number of results to return
+  int32 ef_search = 4;            // HNSW ef_search parameter (accuracy vs speed)
+  optional Filter filter = 5;     // Optional metadata filter
+  optional string distance_metric = 6; // "cosine", "euclidean", or "dot_product"
+}
+
+// HybridSearchRequest combines vector and text search
+message HybridSearchRequest {
+  string namespace = 1;           // Namespace to search in
+  repeated float query_vector = 2; // Query vector
+  string query_text = 3;          // Query text for full-text search
+  int32 k = 4;                    // Number of results to return
+  int32 ef_search = 5;            // HNSW ef_search parameter
+  optional Filter filter = 6;     // Optional metadata filter
+  optional HybridSearchConfig config = 7; // Hybrid search configuration
+}
+
+// HybridSearchConfig configures hybrid search fusion
+message HybridSearchConfig {
+  string fusion_method = 1;       // "rrf" or "weighted"
+  float vector_weight = 2;        // Weight for vector results (alpha)
+  float text_weight = 3;          // Weight for text results (beta)
+  int32 rrf_k = 4;                // RRF k parameter (default 60)
+}
+
+// SearchResponse returns search results
+message SearchResponse {
+  repeated SearchResult results = 1; // List of results
+  int32 total_results = 2;        // Total number of results found
+  float search_time_ms = 3;       // Search time in milliseconds
+  optional string error = 4;      // Error message if failed
+}
+
+// SearchResult represents a single search result
+message SearchResult {
+  string id = 1;                  // Vector ID
+  float distance = 2;             // Distance/similarity score
+  repeated float vector = 3;      // Original vector (optional)
+  map<string, string> metadata = 4; // Metadata
+  optional string text = 5;       // Text content if available
+  optional float vector_score = 6; // Individual vector similarity score
+  optional float text_score = 7;  // Individual text relevance score
+}
+
+// DeleteRequest specifies vector(s) to delete
+message DeleteRequest {
+  string namespace = 1;           // Namespace
+  oneof selector {
+    string id = 2;                // Delete by ID
+    Filter filter = 3;            // Delete by filter
+  }
+}
+
+// DeleteResponse confirms deletion
+message DeleteResponse {
+  int32 deleted_count = 1;        // Number of vectors deleted
+  bool success = 2;               // Operation success status
+  optional string error = 3;      // Error message if failed
+}
+
+// UpdateRequest updates a vector
+message UpdateRequest {
+  string namespace = 1;           // Namespace
+  string id = 2;                  // Vector ID to update
+  repeated float vector = 3;      // New vector (if updating vector, empty if not)
+  map<string, string> metadata = 4; // New metadata (if updating metadata, empty if not)
+  optional string text = 5;       // New text content
+}
+
+// UpdateResponse confirms update
+message UpdateResponse {
+  bool success = 1;               // Operation success status
+  optional string error = 2;      // Error message if failed
+}
+
+// BatchInsertResponse summarizes batch insertion
+message BatchInsertResponse {
+  int32 inserted_count = 1;       // Number of vectors inserted
+  int32 failed_count = 2;         // Number of failed insertions
+  repeated string inserted_ids = 3; // IDs of inserted vectors
+  repeated string errors = 4;     // Error messages for failed insertions
+  float total_time_ms = 5;        // Total time in milliseconds
+}
+
+// Filter represents metadata filtering options
+message Filter {
+  oneof filter_type {
+    ComparisonFilter comparison = 1;
+    RangeFilter range = 2;
+    ListFilter list = 3;
+    GeoRadiusFilter geo_radius = 4;
+    ExistsFilter exists = 5;
+    CompositeFilter composite = 6;
+  }
+}
+
+// ComparisonFilter for equality/inequality checks
+message ComparisonFilter {
+  string field = 1;               // Field name
+  string operator = 2;            // "eq", "ne", "gt", "lt", "gte", "lte"
+  string value = 3;               // Value to compare (string representation)
+}
+
+// RangeFilter for numeric ranges
+message RangeFilter {
+  string field = 1;               // Field name
+  optional string gte = 2;        // Greater than or equal
+  optional string lte = 3;        // Less than or equal
+  optional string gt = 4;         // Greater than
+  optional string lt = 5;         // Less than
+}
+
+// ListFilter for IN/NOT IN operations
+message ListFilter {
+  string field = 1;               // Field name
+  string operator = 2;            // "in" or "not_in"
+  repeated string values = 3;     // List of values
+}
+
+// GeoRadiusFilter for geographic radius queries
+message GeoRadiusFilter {
+  string field = 1;               // Field name (should contain geo coordinates)
+  double latitude = 2;            // Center latitude
+  double longitude = 3;           // Center longitude
+  double radius_km = 4;           // Radius in kilometers
+}
+
+// ExistsFilter checks field existence
+message ExistsFilter {
+  string field = 1;               // Field name
+  bool exists = 2;                // true to check existence, false for non-existence
+}
+
+// CompositeFilter combines multiple filters
+message CompositeFilter {
+  string operator = 1;            // "and", "or", "not"
+  repeated Filter filters = 2;    // Sub-filters
+}
+
+// StatsRequest requests database statistics
+message StatsRequest {
+  optional string namespace = 1;  // Optional namespace (all if not specified)
+}
+
+// StatsResponse returns database statistics
+message StatsResponse {
+  int64 total_vectors = 1;        // Total number of vectors
+  int64 total_namespaces = 2;     // Total number of namespaces
+  int64 memory_usage_bytes = 3;   // Approximate memory usage
+  map<string, NamespaceStats> namespace_stats = 4; // Per-namespace statistics
+}
+
+// NamespaceStats contains statistics for a single namespace
+message NamespaceStats {
+  int64 vector_count = 1;         // Number of vectors in namespace
+  int64 memory_bytes = 2;         // Memory usage for namespace
+  int32 dimensions = 3;           // Vector dimensions
+}
+
+// HealthCheckRequest requests health status
+message HealthCheckRequest {
+  // Empty for now
+}
+
+// HealthCheckResponse returns health status
+message HealthCheckResponse {
+  string status = 1;              // "healthy", "degraded", or "unhealthy"
+  string version = 2;             // Server version
+  int64 uptime_seconds = 3;       // Server uptime
+  map<string, string> details = 4; // Additional health details
+}
