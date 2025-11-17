@@ -1,0 +1,707 @@
+openapi: 3.0.3
+info:
+  title: Vector Database API
+  description: |
+    High-performance vector database with HNSW indexing, hybrid search, and multi-tenancy support.
+
+    ## Authentication
+    Most endpoints require JWT authentication. Include the JWT token in the Authorization header:
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+
+    ## Rate Limiting
+    API requests are rate-limited per IP address or per user. Rate limit headers are included in responses:
+    - `X-RateLimit-Limit`: Maximum requests allowed
+    - `X-RateLimit-Remaining`: Remaining requests in current window
+  version: 1.0.0
+  contact:
+    name: Vector DB Support
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://api.vectordb.example.com
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Health & Stats
+    description: Health checks and database statistics
+  - name: Vectors
+    description: Vector operations (insert, search, update, delete)
+  - name: Search
+    description: Vector and hybrid search operations
+  - name: Documentation
+    description: API documentation
+
+paths:
+  /v1/health:
+    get:
+      tags:
+        - Health & Stats
+      summary: Health check
+      description: Returns the health status of the server
+      security: []
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+
+  /v1/stats:
+    get:
+      tags:
+        - Health & Stats
+      summary: Get database statistics
+      description: Returns statistics for all namespaces
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsResponse'
+
+  /v1/stats/{namespace}:
+    get:
+      tags:
+        - Health & Stats
+      summary: Get namespace statistics
+      description: Returns statistics for a specific namespace
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Namespace identifier
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsResponse'
+
+  /v1/vectors:
+    post:
+      tags:
+        - Vectors
+      summary: Insert a vector
+      description: Insert a single vector with metadata into the database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InsertRequest'
+      responses:
+        '201':
+          description: Vector inserted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsertResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /v1/vectors/search:
+    post:
+      tags:
+        - Search
+      summary: Vector similarity search
+      description: Search for k nearest neighbors using vector similarity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Search completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/vectors/hybrid-search:
+    post:
+      tags:
+        - Search
+      summary: Hybrid search
+      description: Combines vector similarity and full-text search using RRF fusion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HybridSearchRequest'
+      responses:
+        '200':
+          description: Hybrid search completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /v1/vectors/batch:
+    post:
+      tags:
+        - Vectors
+      summary: Batch insert vectors
+      description: Insert multiple vectors efficiently in a single request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/InsertRequest'
+      responses:
+        '201':
+          description: Batch insert completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchInsertResponse'
+
+  /v1/vectors/{namespace}/{id}:
+    delete:
+      tags:
+        - Vectors
+      summary: Delete a vector by ID
+      description: Delete a specific vector by its ID
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Vector deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+
+    put:
+      tags:
+        - Vectors
+      summary: Update a vector
+      description: Update an existing vector's data or metadata
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRequest'
+      responses:
+        '200':
+          description: Vector updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateResponse'
+
+    patch:
+      tags:
+        - Vectors
+      summary: Partially update a vector
+      description: Update specific fields of an existing vector
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRequest'
+      responses:
+        '200':
+          description: Vector updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateResponse'
+
+  /v1/vectors/delete:
+    post:
+      tags:
+        - Vectors
+      summary: Delete vectors by filter
+      description: Delete multiple vectors matching a filter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteRequest'
+      responses:
+        '200':
+          description: Vectors deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+
+  /docs:
+    get:
+      tags:
+        - Documentation
+      summary: Swagger UI
+      description: Interactive API documentation
+      security: []
+      responses:
+        '200':
+          description: Swagger UI page
+
+  /docs/openapi.yaml:
+    get:
+      tags:
+        - Documentation
+      summary: OpenAPI specification
+      description: OpenAPI 3.0 specification in YAML format
+      security: []
+      responses:
+        '200':
+          description: OpenAPI specification
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    InsertRequest:
+      type: object
+      required:
+        - namespace
+        - vector
+      properties:
+        namespace:
+          type: string
+          description: Namespace for multi-tenancy
+        vector:
+          type: array
+          items:
+            type: number
+            format: float
+          description: Vector embedding
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+          description: Metadata key-value pairs
+        id:
+          type: string
+          description: Optional custom ID (auto-generated if not provided)
+        text:
+          type: string
+          description: Optional text content for full-text search
+
+    InsertResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        success:
+          type: boolean
+        error:
+          type: string
+
+    SearchRequest:
+      type: object
+      required:
+        - namespace
+        - query_vector
+        - k
+      properties:
+        namespace:
+          type: string
+        query_vector:
+          type: array
+          items:
+            type: number
+            format: float
+        k:
+          type: integer
+          minimum: 1
+          description: Number of results to return
+        ef_search:
+          type: integer
+          description: HNSW ef_search parameter (higher = more accurate, slower)
+        filter:
+          $ref: '#/components/schemas/Filter'
+        distance_metric:
+          type: string
+          enum: [cosine, euclidean, dot_product]
+
+    HybridSearchRequest:
+      type: object
+      required:
+        - namespace
+        - query_vector
+        - query_text
+        - k
+      properties:
+        namespace:
+          type: string
+        query_vector:
+          type: array
+          items:
+            type: number
+            format: float
+        query_text:
+          type: string
+        k:
+          type: integer
+          minimum: 1
+        ef_search:
+          type: integer
+        filter:
+          $ref: '#/components/schemas/Filter'
+        config:
+          $ref: '#/components/schemas/HybridSearchConfig'
+
+    HybridSearchConfig:
+      type: object
+      properties:
+        fusion_method:
+          type: string
+          enum: [rrf, weighted]
+        vector_weight:
+          type: number
+          format: float
+        text_weight:
+          type: number
+          format: float
+        rrf_k:
+          type: integer
+
+    SearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResult'
+        total_results:
+          type: integer
+        search_time_ms:
+          type: number
+          format: float
+        error:
+          type: string
+
+    SearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+        distance:
+          type: number
+          format: float
+        vector:
+          type: array
+          items:
+            type: number
+            format: float
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        text:
+          type: string
+        vector_score:
+          type: number
+          format: float
+        text_score:
+          type: number
+          format: float
+
+    DeleteRequest:
+      type: object
+      required:
+        - namespace
+      properties:
+        namespace:
+          type: string
+        id:
+          type: string
+        filter:
+          $ref: '#/components/schemas/Filter'
+
+    DeleteResponse:
+      type: object
+      properties:
+        deleted_count:
+          type: integer
+        success:
+          type: boolean
+        error:
+          type: string
+
+    UpdateRequest:
+      type: object
+      properties:
+        vector:
+          type: array
+          items:
+            type: number
+            format: float
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        text:
+          type: string
+
+    UpdateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        error:
+          type: string
+
+    BatchInsertResponse:
+      type: object
+      properties:
+        inserted_count:
+          type: integer
+        failed_count:
+          type: integer
+        inserted_ids:
+          type: array
+          items:
+            type: string
+        errors:
+          type: array
+          items:
+            type: string
+        total_time_ms:
+          type: number
+          format: float
+
+    Filter:
+      type: object
+      description: Metadata filtering (supports comparison, range, list, geo, exists, composite)
+      properties:
+        comparison:
+          $ref: '#/components/schemas/ComparisonFilter'
+        range:
+          $ref: '#/components/schemas/RangeFilter'
+        list:
+          $ref: '#/components/schemas/ListFilter'
+        geo_radius:
+          $ref: '#/components/schemas/GeoRadiusFilter'
+        exists:
+          $ref: '#/components/schemas/ExistsFilter'
+        composite:
+          $ref: '#/components/schemas/CompositeFilter'
+
+    ComparisonFilter:
+      type: object
+      properties:
+        field:
+          type: string
+        operator:
+          type: string
+          enum: [eq, ne, gt, lt, gte, lte]
+        value:
+          type: string
+
+    RangeFilter:
+      type: object
+      properties:
+        field:
+          type: string
+        gte:
+          type: string
+        lte:
+          type: string
+        gt:
+          type: string
+        lt:
+          type: string
+
+    ListFilter:
+      type: object
+      properties:
+        field:
+          type: string
+        operator:
+          type: string
+          enum: [in, not_in]
+        values:
+          type: array
+          items:
+            type: string
+
+    GeoRadiusFilter:
+      type: object
+      properties:
+        field:
+          type: string
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        radius_km:
+          type: number
+          format: double
+
+    ExistsFilter:
+      type: object
+      properties:
+        field:
+          type: string
+        exists:
+          type: boolean
+
+    CompositeFilter:
+      type: object
+      properties:
+        operator:
+          type: string
+          enum: [and, or, not]
+        filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/Filter'
+
+    StatsResponse:
+      type: object
+      properties:
+        total_vectors:
+          type: integer
+          format: int64
+        total_namespaces:
+          type: integer
+          format: int64
+        memory_usage_bytes:
+          type: integer
+          format: int64
+        namespace_stats:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/NamespaceStats'
+
+    NamespaceStats:
+      type: object
+      properties:
+        vector_count:
+          type: integer
+          format: int64
+        memory_bytes:
+          type: integer
+          format: int64
+        dimensions:
+          type: integer
+
+    HealthCheckResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        version:
+          type: string
+        uptime_seconds:
+          type: integer
+          format: int64
+        details:
+          type: object
+          additionalProperties:
+            type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        status:
+          type: integer
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds to wait before retrying
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

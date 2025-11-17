@@ -4,31 +4,76 @@ package vector;
 
 option go_package = "github.com/therealutkarshpriyadarshi/vector/pkg/api/grpc/proto";
 
+import "google/api/annotations.proto";
+
 // VectorDB service provides vector database operations
 service VectorDB {
   // Insert a single vector with metadata
-  rpc Insert(InsertRequest) returns (InsertResponse);
+  rpc Insert(InsertRequest) returns (InsertResponse) {
+    option (google.api.http) = {
+      post: "/v1/vectors"
+      body: "*"
+    };
+  }
 
   // Search for k nearest neighbors using vector similarity
-  rpc Search(SearchRequest) returns (SearchResponse);
+  rpc Search(SearchRequest) returns (SearchResponse) {
+    option (google.api.http) = {
+      post: "/v1/vectors/search"
+      body: "*"
+    };
+  }
 
   // HybridSearch combines vector similarity and full-text search
-  rpc HybridSearch(HybridSearchRequest) returns (SearchResponse);
+  rpc HybridSearch(HybridSearchRequest) returns (SearchResponse) {
+    option (google.api.http) = {
+      post: "/v1/vectors/hybrid-search"
+      body: "*"
+    };
+  }
 
   // Delete a vector by ID
-  rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc Delete(DeleteRequest) returns (DeleteResponse) {
+    option (google.api.http) = {
+      delete: "/v1/vectors/{namespace}/{id}"
+      additional_bindings {
+        post: "/v1/vectors/delete"
+        body: "*"
+      }
+    };
+  }
 
   // Update an existing vector
-  rpc Update(UpdateRequest) returns (UpdateResponse);
+  rpc Update(UpdateRequest) returns (UpdateResponse) {
+    option (google.api.http) = {
+      put: "/v1/vectors/{namespace}/{id}"
+      body: "*"
+      additional_bindings {
+        patch: "/v1/vectors/{namespace}/{id}"
+        body: "*"
+      }
+    };
+  }
 
   // BatchInsert inserts multiple vectors efficiently
   rpc BatchInsert(stream InsertRequest) returns (BatchInsertResponse);
 
   // GetStats returns database statistics
-  rpc GetStats(StatsRequest) returns (StatsResponse);
+  rpc GetStats(StatsRequest) returns (StatsResponse) {
+    option (google.api.http) = {
+      get: "/v1/stats"
+      additional_bindings {
+        get: "/v1/stats/{namespace}"
+      }
+    };
+  }
 
   // HealthCheck returns server health status
-  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse) {
+    option (google.api.http) = {
+      get: "/v1/health"
+    };
+  }
 }
 
 // InsertRequest contains a vector and its metadata
