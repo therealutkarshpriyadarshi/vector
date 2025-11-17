@@ -593,8 +593,7 @@ Examples:
     -namespace production \
     -query '[0.1, 0.2]'
 
-For more information, visit: https://github.com/therealutkarshpriyadarshi/vector
-`)
+For more information, visit: https://github.com/therealutkarshpriyadarshi/vector`)
 }
 
 func parseInt(s string) int {
