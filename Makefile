@@ -1,4 +1,4 @@
-.PHONY: help init build test bench run proto clean lint
+.PHONY: help init build test bench run proto gateway generate clean lint
 
 # Default target
 help:
@@ -13,6 +13,8 @@ help:
 	@echo "  make test          Run unit tests"
 	@echo "  make bench         Run benchmarks"
 	@echo "  make proto         Generate protobuf code"
+	@echo "  make gateway       Generate grpc-gateway and OpenAPI"
+	@echo "  make generate      Generate all (proto + gateway)"
 	@echo ""
 	@echo "Quality:"
 	@echo "  make lint          Run linter"
@@ -91,6 +93,25 @@ proto:
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
 		pkg/api/grpc/proto/*.proto
 	@echo "✅ Protobuf code generated"
+
+# Generate grpc-gateway and OpenAPI
+gateway:
+	@echo "Generating grpc-gateway code and OpenAPI spec..."
+	protoc -I . -I third_party/googleapis --grpc-gateway_out=. \
+		--grpc-gateway_opt logtostderr=true \
+		--grpc-gateway_opt paths=source_relative \
+		--grpc-gateway_opt generate_unbound_methods=true \
+		pkg/api/grpc/proto/vector.proto
+	protoc -I . -I third_party/googleapis --openapiv2_out=. \
+		--openapiv2_opt logtostderr=true \
+		--openapiv2_opt generate_unbound_methods=true \
+		--openapiv2_opt json_names_for_fields=false \
+		pkg/api/grpc/proto/vector.proto
+	@echo "✅ Gateway code and OpenAPI spec generated"
+
+# Generate all protobuf and gateway code
+generate: proto gateway
+	@echo "✅ All generated code updated"
 
 # Format code
 fmt:

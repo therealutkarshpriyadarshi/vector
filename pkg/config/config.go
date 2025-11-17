@@ -10,6 +10,7 @@ import (
 // Config holds all server configuration
 type Config struct {
 	Server   ServerConfig
+	REST     RESTConfig
 	HNSW     HNSWConfig
 	Cache    CacheConfig
 	Database DatabaseConfig
@@ -25,6 +26,25 @@ type ServerConfig struct {
 	EnableTLS       bool          // Enable TLS
 	CertFile        string        // TLS certificate file
 	KeyFile         string        // TLS key file
+}
+
+// RESTConfig holds REST API server configuration
+type RESTConfig struct {
+	Enabled            bool     // Enable REST API (default: true)
+	Host               string   // REST server host (default: "0.0.0.0")
+	Port               int      // REST server port (default: 8080)
+	CORSEnabled        bool     // Enable CORS (default: true)
+	CORSOrigins        []string // Allowed CORS origins (default: ["*"])
+	AuthEnabled        bool     // Enable JWT authentication (default: false)
+	JWTSecret          string   // JWT secret key
+	PublicPaths        []string // Paths that don't require auth
+	AdminPaths         []string // Paths that require admin role
+	RateLimitEnabled   bool     // Enable rate limiting (default: true)
+	RateLimitPerSec    float64  // Requests per second (default: 10)
+	RateLimitBurst     int      // Burst size (default: 20)
+	RateLimitPerIP     bool     // Rate limit per IP (default: true)
+	RateLimitPerUser   bool     // Rate limit per user (default: false)
+	RateLimitGlobal    bool     // Global rate limit (default: false)
 }
 
 // HNSWConfig holds HNSW index configuration
@@ -60,6 +80,23 @@ func Default() *Config {
 			RequestTimeout:  30 * time.Second,
 			ShutdownTimeout: 10 * time.Second,
 			EnableTLS:       false,
+		},
+		REST: RESTConfig{
+			Enabled:          true,
+			Host:             "0.0.0.0",
+			Port:             8080,
+			CORSEnabled:      true,
+			CORSOrigins:      []string{"*"},
+			AuthEnabled:      false,
+			JWTSecret:        "change-this-secret-in-production",
+			PublicPaths:      []string{"/v1/health", "/docs"},
+			AdminPaths:       []string{"/v1/stats"},
+			RateLimitEnabled: true,
+			RateLimitPerSec:  10.0,
+			RateLimitBurst:   20,
+			RateLimitPerIP:   true,
+			RateLimitPerUser: false,
+			RateLimitGlobal:  false,
 		},
 		HNSW: HNSWConfig{
 			M:              16,
@@ -151,6 +188,41 @@ func LoadFromEnv() *Config {
 	}
 	if sync := os.Getenv("VECTOR_SYNC_WRITES"); sync == "true" {
 		cfg.Database.SyncWrites = true
+	}
+
+	// REST API configuration
+	if restEnabled := os.Getenv("VECTOR_REST_ENABLED"); restEnabled == "false" {
+		cfg.REST.Enabled = false
+	}
+	if restHost := os.Getenv("VECTOR_REST_HOST"); restHost != "" {
+		cfg.REST.Host = restHost
+	}
+	if restPort := os.Getenv("VECTOR_REST_PORT"); restPort != "" {
+		if p, err := strconv.Atoi(restPort); err == nil {
+			cfg.REST.Port = p
+		}
+	}
+	if corsEnabled := os.Getenv("VECTOR_CORS_ENABLED"); corsEnabled == "false" {
+		cfg.REST.CORSEnabled = false
+	}
+	if authEnabled := os.Getenv("VECTOR_AUTH_ENABLED"); authEnabled == "true" {
+		cfg.REST.AuthEnabled = true
+	}
+	if jwtSecret := os.Getenv("VECTOR_JWT_SECRET"); jwtSecret != "" {
+		cfg.REST.JWTSecret = jwtSecret
+	}
+	if rateLimitEnabled := os.Getenv("VECTOR_RATE_LIMIT_ENABLED"); rateLimitEnabled == "false" {
+		cfg.REST.RateLimitEnabled = false
+	}
+	if rps := os.Getenv("VECTOR_RATE_LIMIT_PER_SEC"); rps != "" {
+		if r, err := strconv.ParseFloat(rps, 64); err == nil {
+			cfg.REST.RateLimitPerSec = r
+		}
+	}
+	if burst := os.Getenv("VECTOR_RATE_LIMIT_BURST"); burst != "" {
+		if b, err := strconv.Atoi(burst); err == nil {
+			cfg.REST.RateLimitBurst = b
+		}
 	}
 
 	return cfg
