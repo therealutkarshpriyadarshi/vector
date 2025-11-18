@@ -398,3 +398,8 @@ func (pq *ProductQuantizer) GetSubvectorDim() int {
 func (pq *ProductQuantizer) GetBitsPerCode() int {
 	return pq.bitsPerCode
 }
+
+// GetCodebooks returns the codebooks (for DiskANN integration)
+func (pq *ProductQuantizer) GetCodebooks() [][][]float32 {
+	return pq.codebooks
+}

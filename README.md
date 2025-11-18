@@ -1,6 +1,6 @@
-# Vector Database with HNSW Indexing
+# Vector Database with Advanced Indexing Algorithms
 
-A production-grade vector database implementing **HNSW (Hierarchical Navigable Small World)** indexing, hybrid search, and multi-tenancy features. Built in **Go** for rapid development and operational simplicity.
+A production-grade vector database implementing **HNSW**, **DiskANN**, **NSG**, **ScaNN**, and other state-of-the-art indexing algorithms, hybrid search, and multi-tenancy features. Built in **Go** for rapid development and operational simplicity.
 
 ## 🎯 Project Overview
 
@@ -15,6 +15,8 @@ This project demonstrates advanced systems programming by building a specialized
 
 ### Core Features
 - ✅ **HNSW Indexing** - Fast approximate nearest neighbor search (100-1000x faster than brute force)
+- ✅ **DiskANN** - Microsoft's billion-scale, SSD-resident indexing (10-100x memory reduction)
+- ✅ **NSG & ScaNN** - Additional state-of-the-art graph and quantization algorithms
 - ✅ **Hybrid Search** - Combine vector similarity with BM25 full-text search using Reciprocal Rank Fusion
 - ✅ **Multiple Distance Metrics** - Cosine similarity, Euclidean distance, Dot product
 - ✅ **Dynamic Updates** - Add, update, and delete vectors without full rebuild
@@ -186,14 +188,21 @@ HNSW (Hierarchical Navigable Small World) is the state-of-the-art algorithm for 
 
 ## 📖 Example Usage
 
+### HNSW Index (In-Memory)
+
 ```go
 package main
 
 import "github.com/therealutkarshpriyadarshi/vector/pkg/hnsw"
 
 func main() {
-    // Create index
-    idx := hnsw.New(16, 200) // M=16, efConstruction=200
+    // Create HNSW index
+    config := hnsw.IndexConfig{
+        M:              16,
+        efConstruction: 200,
+        DistanceFunc:   hnsw.CosineSimilarity,
+    }
+    idx := hnsw.New(config)
 
     // Insert vectors
     idx.Insert([]float32{0.1, 0.2, 0.3}, map[string]interface{}{
@@ -202,6 +211,45 @@ func main() {
 
     // Search
     results := idx.Search([]float32{0.15, 0.25, 0.35}, 10, 50)
+
+    for _, res := range results {
+        fmt.Printf("ID: %d, Distance: %.4f\n", res.ID, res.Distance)
+    }
+}
+```
+
+### DiskANN Index (Billion-Scale, SSD-Resident)
+
+```go
+package main
+
+import "github.com/therealutkarshpriyadarshi/vector/pkg/diskann"
+
+func main() {
+    // Create DiskANN index
+    config := diskann.IndexConfig{
+        R:               64,           // Edges per node
+        L:               100,          // Search list size
+        BeamWidth:       8,            // Beam search width
+        DataPath:        "./data",     // SSD storage path
+        NumSubvectors:   16,           // Product quantization
+        MemoryGraphSize: 100000,       // Nodes in memory (rest on disk)
+    }
+
+    idx, _ := diskann.New(config)
+    defer idx.Close()
+
+    // Add vectors (batch mode)
+    for i := 0; i < 1000000; i++ {
+        vector := generateVector() // Your vector
+        idx.AddVector(vector, map[string]interface{}{"id": i})
+    }
+
+    // Build index (required for DiskANN)
+    idx.Build()
+
+    // Search (10-100x less memory than HNSW!)
+    results, _ := idx.Search(queryVector, 10)
 
     for _, res := range results {
         fmt.Printf("ID: %d, Distance: %.4f\n", res.ID, res.Distance)
